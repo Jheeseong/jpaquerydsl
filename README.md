@@ -187,3 +187,99 @@
 - fetchResults() : 페이징 정보 포함, count 쿼리 실행
 - fetchCount() : count 쿼리로 변경하여 count 수 조회
 
+# v1.1 1/29
+## QueryDSL 기본 문법
+### 정렬
+
+    @Test
+    public void sortQuery() {
+        em.persist(new Member(null,60));
+        em.persist(new Member("member6",60));
+        em.persist(new Member("member6",60));
+
+        List<Member> result = queryFactory
+                .select(member)
+                .from(member)
+                .orderBy(member.age.desc(), member.name.asc().nullsLast())
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+- desc() : 내림차순, asc() : 올림차순
+- nullsLast() : null 마지막, nullFirst() null 처음
+
+### 페이징
+
+    @Test
+    public void pagingQuery() {
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .orderBy(member.name.desc())
+                .offset(1)
+                .limit(2)
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+
+        QueryResults<Member> result2 = queryFactory
+                .selectFrom(member)
+                .orderBy(member.name.desc())
+                .offset(0)
+                .limit(2)
+                .fetchResults();
+
+        System.out.println("result2.getTotal() = " + result2.getTotal());
+        System.out.println("result2.getLimit() = " + result2.getLimit());
+        System.out.println("result2.getResults() = " + result2.getResults());
+    }
+    
+- 페이징 시 fetch() 사용 시 조회 건수가 제한(count 쿼리 안 나감)
+- fetchResults() 사용 시 페이징 수, 총 갯수 등을 확인 가능(but. count 쿼리가 나감)
+  - count 쿼리는 조인이 필요 없느 경우도 있는데 이 경우 조인 되어 성능 최적화가 필요
+  -> count 전용 쿼리를 별도로 작성!!!
+  
+### 집합
+
+    @Test
+    public void aggregationQuery() {
+        List<Tuple> result = queryFactory
+                .select(member.count(),
+                        member.age.sum(),
+                        member.age.avg(),
+                        member.age.max(),
+                        member.age.min())
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+- JPQL이 제공하는 모든 집합 함수 제공
+- tuple로 반환
+
+### GruopBy
+
+    @Test
+    public void groupQuery() {
+        List<Tuple> result = queryFactory
+                .select(team.name, member.age.avg())
+                .from(member)
+                .join(member.team, team)
+                .groupBy(team.name)
+                .having(team.name.eq("teamB"))
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+- 그룹화 하여 쿼리 생성
+- 그룹화의 결과를 제한하려면 having 사용
