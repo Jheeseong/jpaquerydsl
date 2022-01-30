@@ -187,7 +187,7 @@
 - fetchResults() : 페이징 정보 포함, count 쿼리 실행
 - fetchCount() : count 쿼리로 변경하여 count 수 조회
 
-# v1.1 1/29
+# v1.2 1/29
 ## QueryDSL 기본 문법
 ### 정렬
 
@@ -283,3 +283,227 @@
     
 - 그룹화 하여 쿼리 생성
 - 그룹화의 결과를 제한하려면 having 사용
+
+
+# v1.3 1/30
+## QueryDSL 기본 문법
+### 조인
+#### 기본 조인
+    
+    @Test
+    public void joinTest() {
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .join(member.team, team)
+                .where(team.name.eq("teamA"))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+- join(),innerjoin() : 내부 조인
+- leftJoin() : left 외부 조인
+- rightJoin() : right 외부 조인
+
+#### 세타 조인
+
+    @Test
+    public void thetaJoinTest() {
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .from(member, team)
+                .where(member.name.eq(team.name))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+- 연관관계가 없는 필드로 조인
+- from 절에 여러 엔티티 선택해서 세타 조인
+- 외부 조인 불가능
+
+#### on 절
+**조인 대상 필터링**
+
+    @Test
+    public void on_joinTest() {
+        List<Tuple> result = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(member.team,team).on(team.name.eq("teamA"))
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+    결과
+    
+    tuple = [Member(id=3, name=member1, age=10), Team(id=1, name=teamA)]
+    tuple = [Member(id=4, name=member1, age=16), Team(id=1, name=teamA)]
+    tuple = [Member(id=5, name=member3, age=20), Team(id=1, name=teamA)]
+    tuple = [Member(id=6, name=member4, age=30), null]
+    tuple = [Member(id=7, name=member5, age=40), null]
+    
+- on 절을 활용해 조인 대상을 필터링 할 때 내부 조인(inner join) 시 where과 동일한 기능이 발생
+- 따라서 on절 사용할 시 외부조인을 이용.
+
+**연관관계 없는 엔티티 외부 조인**
+
+    @Test
+    public void on_join_no_relation() {
+
+        em.persist(new Member("teamA"));
+        em.persist(new Member("teamB"));
+
+        List<Tuple> result = queryFactory
+                .select(member, team)
+                .from(member)
+                .leftJoin(team).on(member.name.eq(team.name))
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+    결과
+    
+    tuple = [Member(id=3, name=member1, age=10), null]
+    tuple = [Member(id=4, name=member1, age=16), null]
+    tuple = [Member(id=5, name=member3, age=20), null]
+    tuple = [Member(id=6, name=member4, age=30), null]
+    tuple = [Member(id=7, name=member5, age=40), null]
+    tuple = [Member(id=8, name=teamA, age=0), Team(id=1, name=teamA)]
+    tuple = [Member(id=9, name=teamB, age=0), Team(id=2, name=teamB)]
+
+#### 조인 패치
+
+    @Test
+    public void fetch_joinTest() {
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .join(member.team, team).fetchJoin()
+                .where(team.name.eq("teamA"))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+#### 서브 쿼리
+**서브 쿼리 eq**
+
+    @Test
+    public void subQueryTest() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.eq(select(memberSub.age.min())
+                        .from(memberSub)))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+
+**서브쿼리 Goe**
+
+    @Test
+    public void subQueryGoe() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.goe(select(memberSub.age.avg())
+                        .from(memberSub)))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+**서브쿼리 in 사용**
+
+    @Test
+    public void subQueryIn() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .where(member.age.in(select(memberSub.age)
+                        .from(memberSub)
+                        .where(memberSub.age.between(10, 30))))
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+**select 절에 subquery**
+
+    @Test
+    public void selectSubQueryTest(){
+        QMember memberSub = new QMember("memberSub");
+
+        List<Tuple> result = queryFactory
+                .select(member.name, select(memberSub.age.avg())
+                        .from(memberSub))
+                .from(member)
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+- JPAExpressions 사용
+- from절의 서브쿼리 한계 : from절의 서브쿼리는 지원 X
+  - 해경 방안 : 서브 쿼리를 join로 변경, 쿼리를 2번 분리, nativeSQL 사용
+
+### Case 문
+
+    @Test
+    public void caseComplex() {
+        StringExpression rankPath = new CaseBuilder()
+                .when(member.age.between(0, 20)).then("0~20살")
+                .when(member.age.between(21, 30)).then("21~30살")
+                .otherwise("기타");
+
+
+        List<Tuple> result = queryFactory
+                .select(member.name, member.age, rankPath)
+                .from(member)
+                .orderBy(rankPath.asc())
+                .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    
+### 상수, 문자 더하기
+
+    @Test
+    public void addString() {
+        List<String> result = queryFactory
+                .select(member.name.concat("_").concat(member.age.stringValue()))
+                .from(member)
+                .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
+    
+- .stringValue() 가 다른 타입을 문자로 변환시켜주는 역할을 함.
