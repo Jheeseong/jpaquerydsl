@@ -78,7 +78,7 @@
 - build -> generated -> querydsl -> study.querydsl.entity.Q-- 파일 생성 확인
 
 # v1.1 1/28
-## QueryDSL 기본 문법
+## QueryDSL 문법(1)
 ### JPQL vs QueryDSL
 **JPQL**
 
@@ -507,3 +507,151 @@
     }
     
 - .stringValue() 가 다른 타입을 문자로 변환시켜주는 역할을 함.
+
+
+# v1.4 1/31
+## QueryDSL 문법(2)
+### 프로젝션 결과 반환
+
+    @Test
+    public void projectionReturnValue() {
+    
+    // 프로젝션 대상이 하나//
+        List<String> oneResult = queryFactory
+                .select(member.name)
+                .from(member)
+                .fetch();
+
+    // 프로젝션 대상 여러 개//
+        List<Tuple> manyResult = queryFactory
+                .select(member.name, member.age)
+                .from(member)
+                .fetch();
+    }
+    
+- 프로젝션 대상이 하나일 경우 타입을 명확하게 지정 가능
+- 대상이 둘 이상일 경우 튜플이나 DTO로 조회
+
+### DTO 조회
+#### 프로미터 접근 - Setter
+    
+    @Test
+    public void searchDto_setter() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.bean(MemberDto.class,
+                        member.name,
+                        member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
+    
+- Projection.baen 을 사용하여 setter를 통한 조회
+- DTO class에 setter가 있어야 접근 가능
+
+#### 필터 직접 접근
+
+    @Test
+    public void searchDto_field() {
+        QMember memberSub = new QMember("memberSub");
+        List<UserDto> result = queryFactory
+                .select(Projections.fields(UserDto.class,
+                        member.name.as("userName"),
+                        ExpressionUtils.as(select(member.age.max())
+                                .from(memberSub), "age")))
+                .from(member)
+                .fetch();
+
+        for (UserDto userDto : result) {
+            System.out.println("userDto = " + userDto);
+        }
+    }
+    
+- Projection.field 를 사용하여 DTO field 적용
+- 프로퍼티나, 필드 접근 생성 방식에서 이름이 다를 경우 필드.as 혹은 ExpressionUtils.as(서브 쿼리) 사용
+    
+#### 생성자 사용 접근
+
+    @Test
+    public void searchDto_constructor() {
+        List<MemberDto> result = queryFactory
+                .select(new QMemberDto(member.name, member.age))
+                .from(member)
+                .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
+    
+- DTO Class 생성자에 @QueryProjection 추가 후 쿼리 컴파일 진행 필수
+- 컴파일러로 타입 체크가 가능하나 DTO에 QueryDSL 어노테이션을 유지해야 하는 점과 DTO까지 Q 파일 생성해야하는 단점 존재
+
+### 동적 쿼리
+#### BooleanBuilder
+
+    @Test
+    public void booleanBuilderQuery() {
+        String nameParam = "member3";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember1(nameParam,ageParam);
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+
+    private List<Member> searchMember1(String nameCond, Integer ageCond) {
+        BooleanBuilder builder = new BooleanBuilder();
+
+        if (ageCond != null) {
+            builder.and(member.age.eq(ageCond));
+        }
+
+        if(nameCond != null) {
+            builder.and(member.name.eq(nameCond));
+        }
+        return queryFactory
+                .selectFrom(member)
+                .where(builder)
+                .fetch();
+    }
+    
+#### where 다중 파라미터 사용
+
+    @Test
+    public void whereParamTest() {
+
+        String nameParam = "member3";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember2(nameParam,ageParam);
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+
+    private List<Member> searchMember2(String nameCond, Integer ageCond) {
+        return  queryFactory
+                .selectFrom(member)
+                .where(nameEq(nameCond), ageEq(ageCond))
+                .fetch();
+    }
+
+    private BooleanExpression nameEq(String nameCond) {
+        return nameCond != null ? member.name.eq(nameCond) : null;
+    }
+
+    private BooleanExpression ageEq(Integer ageCond) {
+        return ageCond != null ? member.age.eq(ageCond) : null;
+    }
+    
+- where 조건에 null 값은 무시된다
+- 메서드를 다른 쿼리에 재활용 가능
+- 쿼리 가독성이 좋아짐
+
