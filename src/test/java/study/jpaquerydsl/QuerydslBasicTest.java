@@ -447,5 +447,25 @@ public class QuerydslBasicTest {
         return ageCond != null ? member.age.eq(ageCond) : null;
     }
 
+    @Test
+    public void bulkQuery() {
+        long update = queryFactory
+                .update(member)
+                .set(member.name, "비회원")
+                .where(member.age.lt(20))
+                .execute();
+
+        em.flush();
+        em.clear();
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+
 
 }
