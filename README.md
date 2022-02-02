@@ -655,3 +655,31 @@
 - 메서드를 다른 쿼리에 재활용 가능
 - 쿼리 가독성이 좋아짐
 
+# v1.5 2/1
+## QueryDSL 문법(2)
+### 불크 연산
+
+    @Test
+    public void bulkQuery() {
+        long update = queryFactory
+                .update(member)
+                .set(member.name, "비회원")
+                .where(member.age.lt(20))
+                .execute();
+
+        em.flush();
+        em.clear();
+
+        List<Member> result = queryFactory
+                .selectFrom(member)
+                .fetch();
+
+        for (Member member1 : result) {
+            System.out.println("member1 = " + member1);
+        }
+    }
+    
+- 대량 데이터를 한번에 변경 가능
+- update 시 DB는 변하지만 영속성 컨텍스트에는 아직 이전 데이터를 유지 중
+- 영속성 컨텍스트를 통한 조회 시 이전 데이터를 불러와 오류가 만들어짐
+- 영속성 컨텍스트 초기화가 필수!!
