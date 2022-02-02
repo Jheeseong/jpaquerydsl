@@ -15,12 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
-import study.jpaquerydsl.dto.MemberDto;
-import study.jpaquerydsl.dto.QMemberDto;
-import study.jpaquerydsl.dto.UserDto;
+import study.jpaquerydsl.dto.*;
 import study.jpaquerydsl.entity.Member;
 import study.jpaquerydsl.entity.QMember;
 import study.jpaquerydsl.entity.Team;
+import study.jpaquerydsl.repository.MemberRepositoryCustomImpl;
 
 import javax.persistence.EntityManager;
 
@@ -39,6 +38,9 @@ public class QuerydslBasicTest {
     EntityManager em;
 
     JPAQueryFactory queryFactory;
+
+    @Autowired
+    MemberRepositoryCustomImpl memberRepositoryCustom;
 
     @BeforeEach
     public void Init() {
@@ -459,6 +461,20 @@ public class QuerydslBasicTest {
 
         for (Member member1 : result) {
             System.out.println("member1 = " + member1);
+        }
+    }
+
+    @Test
+    public void searchByRepository() {
+        MemberSearchCond cond = new MemberSearchCond();
+        cond.setAgeGoe(10);
+        cond.setAgeLoe(30);
+        cond.setTeamName("teamA");
+
+        List<MemberTeamDto> result = memberRepositoryCustom.searchByBuilder(cond);
+
+        for (MemberTeamDto memberTeamDto : result) {
+            System.out.println("memberTeamDto = " + memberTeamDto);
         }
     }
 
