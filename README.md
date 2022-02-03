@@ -750,3 +750,64 @@
     
 - MemberTeamDTO에 QMemberTeamDTO 생성을 위해 @QueryProjection을 추가함
 - 의존을 피하고 싶으면 projection.bean(), fields(), constructor()을 사용
+
+# v1.7 2/3
+## JPA 리포지토리와 Querydsl 적용
+### 동적쿼리 where 적용 및 API 조회
+**레포지토리**
+
+    public List<MemberTeamDto> searchByWhere(MemberSearchCond cond) {
+        return queryFactory
+                .select(new QMemberTeamDto(
+                        member.id,
+                        member.name,
+                        member.age,
+                        team.id,
+                        team.name))
+                .from(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()))
+                .fetch();
+    }
+
+    private BooleanExpression nameEq(String userName) {
+        return userName != null ? member.name.eq(userName) : null;
+    }
+
+    private BooleanExpression teamNameEq(String teamName) {
+        return teamName != null ? team.name.eq(teamName) : null;
+    }
+
+    private BooleanExpression ageGoe(Integer ageGoe) {
+        return ageGoe != null ? member.age.goe(ageGoe) : null;
+    }
+
+    private BooleanExpression ageLoe(Integer ageLoe) {
+        return ageLoe != null ? member.age.loe(ageLoe) : null;
+    }
+
+- where 절에 파라미터 방식 사용 시 조건을 재사용 가능
+	
+**조회 API 컨트롤러**
+    
+    @RestController
+    @RequiredArgsConstructor
+    public class MemberController {
+
+        private final MemberRepositoryCustomImpl memberRepositoryCustomImpl;
+
+        @GetMapping("/v1/members")
+        public List<MemberTeamDto> searchMemberV1(MemberSearchCond cond) {
+            return memberRepositoryCustomImpl.searchByWhere(cond);
+        }
+    }
+    
+**JSON 결과 값**
+- http://localhost:8080/v1/members?teamName=teamB&ageGoe=31&ageLoe=35
+
+![image](https://user-images.githubusercontent.com/96407257/152271951-9a532433-f68b-4eb8-ae12-7c273e756901.png)
+
+	
