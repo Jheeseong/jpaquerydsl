@@ -683,3 +683,70 @@
 - update 시 DB는 변하지만 영속성 컨텍스트에는 아직 이전 데이터를 유지 중
 - 영속성 컨텍스트를 통한 조회 시 이전 데이터를 불러와 오류가 만들어짐
 - 영속성 컨텍스트 초기화가 필수!!
+
+# v1.6 2/2
+## JPA 리포지토리와 Querydsl 적용
+### 동적쿼리 Builder 적용
+**DTO 생성**
+
+    @Data
+    public class MemberTeamDto {
+
+        private Long memberId;
+        private String userName;
+        private int age;
+        private Long teamId;
+        private String teamName;
+
+        @QueryProjection
+        public MemberTeamDto(Long memberId, String userName, int age, Long teamId, String teamName) {
+            this.memberId = memberId;
+            this.userName = userName;
+            this.age = age;
+            this.teamId = teamId;
+            this.teamName = teamName;
+        }
+    }
+    
+**검색 조건**
+
+    @Data
+    public class MemberSearchCond {
+
+        private String userName;
+        private String teamName;
+        private Integer ageGoe;
+        private Integer ageLoe;
+    }
+    
+**동적쿼리 - builder**
+
+    public List<MemberTeamDto> searchByBuilder(MemberSearchCond cond) {
+        BooleanBuilder builder = new BooleanBuilder();
+        if (cond.getUserName() != null) {
+            builder.and(member.name.eq(cond.getUserName()));
+        }
+        if (cond.getTeamName() != null) {
+            builder.and(team.name.eq(cond.getTeamName()));
+        }
+        if (cond.getAgeGoe() != null) {
+            builder.and(member.age.goe(cond.getAgeGoe()));
+        }
+        if (cond.getAgeLoe() != null) {
+            builder.and(member.age.loe(cond.getAgeLoe()));
+        }
+        return queryFactory
+                .select(new QMemberTeamDto(
+                        member.id,
+                        member.name,
+                        member.age,
+                        team.id,
+                        team.name))
+                .from(member)
+                .leftJoin(member.team, team)
+                .where(builder)
+                .fetch();
+    }
+    
+- MemberTeamDTO에 QMemberTeamDTO 생성을 위해 @QueryProjection을 추가함
+- 의존을 피하고 싶으면 projection.bean(), fields(), constructor()을 사용
