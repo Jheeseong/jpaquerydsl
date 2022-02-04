@@ -811,3 +811,114 @@
 ![image](https://user-images.githubusercontent.com/96407257/152271951-9a532433-f68b-4eb8-ae12-7c273e756901.png)
 
 	
+# v1.7 2/3
+## 사용자 정의 리포지토리
+**사용자 정의 리포지토리 구성**  
+![image](https://user-images.githubusercontent.com/96407257/152510793-c867f3a7-223f-46e1-9cf4-d71f621141a4.png)  
+
+**MemberRepository**
+
+    public interface MemberRepository extends JpaRepository<Member, Long>, MemberRepositoryCustom {
+    List<Member> findByName(String username);
+    }
+    
+**MemberRepositoryCustom**
+
+    public interface MemberRepositoryCustom{
+    
+    ....
+    
+    }
+    
+**MemberRepositoryCostomImpl**
+
+    public class MemberRepositoryCustomImpl implements MemberRepositoryCustom{
+
+        private final JPAQueryFactory queryFactory;
+
+        public MemberRepositoryCustomImpl(EntityManager em) {
+            this.queryFactory = new JPAQueryFactory(em);
+        }
+	
+	....
+	
+    }
+    
+## 스프링 데이터 페이징 - Querydsl 페이징 연동  
+**MemberRepositoryCustom 함수 추가**
+
+    public interface MemberRepositoryCustom{
+
+    ....
+
+    Page<MemberTeamDto> searchPageSimple(MemberSearchCond cond, Pageable pageable);
+
+    Page<MemberTeamDto> searchPageComplex(MemberSearchCond cond, Pageable pageable);
+    
+    }
+    
+**MemberRepositoryCustom에 쿼리 추가**  
+
+**데이터 쿼리 카운터 쿼리 한번에 조회**
+
+    public Page<MemberTeamDto> searchPageSimple(MemberSearchCond cond, Pageable pageable) {
+        QueryResults<MemberTeamDto> results = queryFactory
+                .select(new QMemberTeamDto(
+                        member.id,
+                        member.name,
+                        member.age,
+                        team.id,
+                        team.name))
+                .from(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetchResults();
+
+        List<MemberTeamDto> content = results.getResults();
+        long total = results.getTotal();
+
+        return new PageImpl<>(content, pageable, total);
+    }
+
+**카운트 쿼리 데이터 쿼리 분리**
+
+    public Page<MemberTeamDto> searchPageComplex(MemberSearchCond cond, Pageable pageable) {
+        List<MemberTeamDto> content = queryFactory
+                .select(new QMemberTeamDto(
+                        member.id,
+                        member.name,
+                        member.age,
+                        team.id,
+                        team.name))
+                .from(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        long total = queryFactory
+                .selectFrom(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()))
+                .fetchCount();
+
+
+        return new PageImpl<>(content, pageable, total);
+    }
+
+**결과**
+
+![image](https://user-images.githubusercontent.com/96407257/152512544-5cd53ec8-60a6-4f8e-95e3-b4c71f8f36b6.png)
+
