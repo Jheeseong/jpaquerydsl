@@ -922,3 +922,39 @@
 
 ![image](https://user-images.githubusercontent.com/96407257/152512544-5cd53ec8-60a6-4f8e-95e3-b4c71f8f36b6.png)
 
+# v1.7 2/3
+## 사용자 정의 리포지토리
+### 스프링 데이터 페이징 활용2 - countQuery 최적화
+
+    public Page<MemberTeamDto> searchPageComplex2(MemberSearchCond cond, Pageable pageable) {
+        List<MemberTeamDto> content = queryFactory
+                .select(new QMemberTeamDto(
+                        member.id,
+                        member.name,
+                        member.age,
+                        team.id,
+                        team.name))
+                .from(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        JPAQuery<Member> countQuery = queryFactory
+                .selectFrom(member)
+                .leftJoin(member.team, team)
+                .where(nameEq(cond.getUserName()),
+                        teamNameEq(cond.getTeamName()),
+                        ageGoe(cond.getAgeGoe()),
+                        ageLoe(cond.getAgeLoe()));
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchCount);
+    }
+    
+- PageableExecutionUtill.getPage 함수를 통해서 count 쿼리가 생략 가능한 경우 생략해서 처리
+  - 페이지 시작이면서 컨텐츠 사이즈가 페이지 사이즈보다 작을 떄 생략
+  - 마지막 페이지 일 때 (offset + 컨텐츠 사이즈를 더해서 전체 사이즈 구함) 생략
